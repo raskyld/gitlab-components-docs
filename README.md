@@ -1,5 +1,7 @@
 # gitlab-components-docs
 
+> :warning: In active development, do not use yet, please.
+
 A dead simple auto-docs generator for [Gitlab CI/CD components][gitlab-components].
 
 ## Beta Notice
