@@ -1,11 +1,14 @@
 mod gitlab;
 
-use std::collections::HashMap;
+use std::collections::{HashMap};
 use std::env::current_dir;
-use std::fs::read_dir;
+
+
 use log::{error, info, warn};
 use tera::{Context, Tera, Value};
 use clap::Parser;
+
+use crate::gitlab::Components;
 
 const DEFAULT_README_TPL: &'static str = r####"
 # {{ catalog_name }}
@@ -15,9 +18,11 @@ const DEFAULT_README_TPL: &'static str = r####"
 ## Components
 
 {% for comp in components -%}
-### {{ comp.name }}
+{% for in_name, input in comp.spec.inputs -%}
+### {{ in_name }}
 
-{{ inputs_table(inputs=comp.inputs) }}
+{{ inputs_table(inputs=comp.spec.inputs) }}
+{%- endfor %}
 {%- endfor %}
 "####;
 
@@ -60,30 +65,36 @@ fn main() {
         }
     };
 
-    ctx.insert("catalog_desc", cli.catalog_desc.map_or("A super GitLab CI/CD catalog!", |a| &Box::new(a)));
+    ctx.insert("catalog_desc", &cli.catalog_desc.unwrap_or("A super GitLab CI/CD catalog!".to_owned()));
 
-    if let dir = read_dir("./templates").unwrap() {
-        dir.collect()
-    }
+    let mut components: Vec<Components> = vec![];
+    match gitlab::load_components() {
+        Ok(results) => for (name, loading_result) in results {
+            match loading_result {
+                gitlab::LoadingResult::Failed(warnings) => warn!("could not load {}: {}", name, warnings.join(", ")),
+                gitlab::LoadingResult::Success(comp) => components.push(comp)
+            }
+        },
+        Err(err) => error!("could not load components: {}", err.to_string())
+    };
+
+    ctx.insert("components", &components);
+
+    info!("content is: {}", engine.render("README.md.tera", &ctx).unwrap())
 }
 
 fn create_engine() -> Tera {
-    let mut engine = match Tera::new("*.md.tera") {
-        Ok(tera) => tera,
-        Err(e) => {
-            warn!("glob *.md.tera failed: {}", e.to_string());
+    let mut engine = Tera::default();
+    engine.add_template_file("README.md.tera", None).unwrap_or_else(|err| {
+            warn!("failed to load README.md.tera: {}", err.to_string());
             info!("Using sensible default for the README!");
             // NB(raskyld): it's fine to panic in this case as
             // we are not supposed to release a compiled binary with a malformed
             // built-in template
-            let mut tera = Tera::default();
-            tera.add_raw_template("README.md.tera", DEFAULT_README_TPL).unwrap();
-            return tera
-        }
-    };
+            engine.add_raw_template("README.md.tera", DEFAULT_README_TPL).unwrap();
+    });
 
     engine.register_function("inputs_table", inputs_table);
-
     engine
 }
 
