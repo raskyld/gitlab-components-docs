@@ -3,10 +3,14 @@ mod templates;
 
 use std::collections::BTreeMap;
 use std::env::current_dir;
+use std::fs::File;
+use std::io;
+use std::io::{stdout, Write};
+use std::process::exit;
 
 use crate::gitlab::Components;
 use clap::Parser;
-use log::{error, info, warn};
+use log::{error, warn};
 use tera::Context;
 
 const DEFAULT_CATALOG_NAME: &str = "Unnamed GitLab CI/CD Catalog";
@@ -23,9 +27,13 @@ struct Cli {
     #[arg(short = 'd', long)]
     catalog_desc: Option<String>,
 
-    /// Remove the footer added at the end of the README
+    /// Remove the footer added at the end of the README.md
     #[arg(long)]
     no_footer: bool,
+
+    /// Write to stdout instead of writing to README.md
+    #[arg(long)]
+    dry_run: bool,
 }
 
 fn main() {
@@ -85,7 +93,44 @@ fn main() {
     ctx.insert("version", get_version());
     ctx.insert("footer_enabled", &!cli.no_footer);
 
-    info!("content is: {}", engine.render("entrypoint", &ctx).unwrap())
+    let rendered = match engine.render("entrypoint", &ctx) {
+        Ok(rendered) => rendered,
+        Err(err) => {
+            error!("failed to render README.md: {}", err);
+            exit(1);
+        }
+    };
+
+    let mut writer: Box<dyn Write> = if cli.dry_run {
+        Box::new(stdout())
+    } else {
+        match File::create("README.md") {
+            Ok(file) => Box::new(file),
+            Err(err) => {
+                error!("failed to open README.md: {}", err.to_string());
+                exit(1);
+            }
+        }
+    };
+
+    'retry_write: loop {
+        match Write::write(&mut writer, rendered.as_bytes()) {
+            Err(err) => match err.kind() {
+                io::ErrorKind::Interrupted => continue 'retry_write,
+                _ => {
+                    error!("failed to write the result: {}", err.to_string());
+                    exit(2);
+                }
+            },
+            Ok(_) => {
+                Write::flush(&mut writer).unwrap_or_else(|err| {
+                    error!("failed to flush the result: {}", err.to_string());
+                    exit(3);
+                });
+                break 'retry_write;
+            }
+        }
+    }
 }
 
 #[cfg(debug_assertions)]

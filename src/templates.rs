@@ -10,6 +10,8 @@ pub const DEFAULT_README_TPL: &str = r####"
 
 ## Components
 
+[[_TOC_]]
+
 {% for name, comp in components -%}
 ### {{ name }}
 
@@ -23,6 +25,7 @@ pub const ENTRYPOINT_TEMPLATE: &str = r####"
 ---
 
 Generated with [raskyld/gitlab-components-docs](https://github.com/raskyld/gitlab-components-docs) :purple_heart:
+
 Version: `{{ version }}`.
 {%- endif %}
 "####;
@@ -31,7 +34,7 @@ pub const MACROS: &str = r####"
 {% macro inputs_table(inputs) -%}
 | Name | Type | Description | Default |
 | --- | --- | --- | --- |
-{% for name, input in inputs %}
+{% for name, input in inputs -%}
 | `{{ name }}` | `{{ input.type | default(value="string") }}` | {{ input.description | trim_newline }} | `{{ input.default }}` |
 {% endfor %}
 {%- endmacro inputs_table %}
