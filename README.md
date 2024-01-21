@@ -13,7 +13,7 @@ As of this writing, GitLab CI/CD components are a Beta feature so expect changes
 If you want to run it directly, you can use cargo to build and install it on your workstation.
 
 ```shell
-cargo install --git https://github.com/raskyld/gitlab-components-docs --tag 0.1.0
+cargo install --git https://github.com/raskyld/gitlab-components-docs --tag 0.2.0
 ```
 
 I recommend you, though, that you run the CLI using an OCI runtime such as Docker.
@@ -24,7 +24,7 @@ This CLI comes with sensible default, all you have to provide is the name and de
 your catalog.
 
 ```
-docker run --rm -v "$(pwd):/gitlab" -u "$(id -u)" ghcr.io/raskyld/gitlab-components-docs:0.1.0 \
+docker run --rm -v "$(pwd):/gitlab" -u "$(id -u)" ghcr.io/raskyld/gitlab-components-docs:0.2.0 \
     -n <YOUR_CATALOG_NAME> \
     -d "<YOUR_CATALOG_DESCRIPTION>"
 ```
